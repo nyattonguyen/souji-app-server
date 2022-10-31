@@ -1,49 +1,60 @@
-const mongoose = require('mongoose');
+const mongoose = require("mongoose");
 
 const orderSchema = mongoose.Schema({
-     orderItems: [{
-          type: mongoose.Schema.Types.ObjectId,
-          ref: 'OrderItem',
-          required:true
-      }],
-    address:{
-         type: String,
-         require: true
+  orderItems: [
+    {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "OrderItem",
+      required: true,
     },
-    name:{
-         type:String,
-         require:true
-    },
-    phone:{
-         type:String,
-         require:true,
-    },
-    status:{
-         type:String,
-         require:true,
-         default:"Chờ xác nhận",
-    },
-    totalPrice: {
-         type: Number,
-    },
-    user: {
-         type: mongoose.Schema.Types.ObjectId,
-         ref:'User',
-    }
-     
- })
-
-orderSchema.virtual('id').get(function () {
-    return this._id.toHexString();
+  ],
+  address: {
+    type: String,
+    require: true,
+  }, 
+  name: {
+    type: String,
+    require: true,
+  },
+  phone: {
+    type: String,
+    require: true,
+  },
+  status: {
+    type: String,
+    require: true,
+    default: "4",
+  },
+  totalPrice: {
+    type: Number,
+  },
+  user: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "User",
+  },
+  date: {
+    type: String,
+    require: true,
+  },
+  hours: {
+    type: String,
+    require: true,
+  },
+  dateOrdered: {
+    type: Date,
+    default: Date.now,
+  },
 });
 
-orderSchema.set('toJSON', {
-    virtuals: true,
+orderSchema.virtual("id").get(function () {
+  return this._id.toHexString();
 });
 
-exports.Order = mongoose.model('Order', orderSchema);
+orderSchema.set("toJSON", {
+  virtuals: true,
+});
 
-
+exports.Order = mongoose.model("Order", orderSchema);
 
 /**
 Order Example:

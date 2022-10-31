@@ -58,7 +58,3 @@ var server = app.listen(process.env.PORT || 3333, function() {
     console.log("Express is working on port " + port);
 })
 
-// var port = process.env.PORT || 3333;
-// server.listen(port, function() {
-//     console.log("Express is working on port " + port);
-// })

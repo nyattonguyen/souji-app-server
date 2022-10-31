@@ -29,6 +29,7 @@ router.get('/:id', async(req, res)=> {
 
 
 router.post(`/`, async (req, res) =>{
+    console.log(req.body.category)
     const category = await Category.findById(req.body.category);
     if(!category) return res.status(400).send('Invalid Category')
 

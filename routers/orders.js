@@ -14,14 +14,21 @@ const { response } = require('express');
 
 
 // lấy tất cả các order
-router.get('/', isAuthenticatedUser, authorizeRoles(), async(req, res) => {
+// router.get('/', isAuthenticatedUser, authorizeRoles(), async(req, res) => {
+//     const orderList = await Order.find().populate('user', 'name');
+//     if(!orderList) {
+//         res.status(500).json({message: false})
+//     }
+//     res.status(200).send(orderList);
+// })
+
+router.get('/', catchasyncerror(async(req, res) => {
     const orderList = await Order.find().populate('user', 'name');
     if(!orderList) {
         res.status(500).json({message: false})
     }
     res.status(200).send(orderList);
-})
-
+}))
 //lấy 1 order
 router.get(`/:id`, catchasyncerror(async(req, res, next) => {
     const order = await Order.findById(req.params.id)
@@ -34,12 +41,11 @@ router.get(`/:id`, catchasyncerror(async(req, res, next) => {
 }))
 
 // booking 
-router.post(`/` , isAuthenticatedUser ,catchasyncerror( async (req, res, next) =>{
+router.post(`/` , catchasyncerror( async (req, res, next) =>{
     
         const orderItemsIds = Promise.all(req.body.orderItems.map(async (orderItem) =>{
             let newOrderItem = new OrderItem({
-                date:orderItem.date,
-                hours:orderItem.hours,
+                quanlity: orderItem.quanlity,
                 product: orderItem.product
             })
     
@@ -65,6 +71,9 @@ router.post(`/` , isAuthenticatedUser ,catchasyncerror( async (req, res, next) =
             status: req.body.status,
             totalPrice: totalPrice,
             user: req.body.user,
+            country: req.body.country,
+            hours: req.body.hours,
+            date: req.body.date
         })
         order = await order.save();
         if(!order)
@@ -74,20 +83,35 @@ router.post(`/` , isAuthenticatedUser ,catchasyncerror( async (req, res, next) =
     
 }))
 
-// cập nhật tình trạng order (-> dang hoat dong)
-router.put('/:orderid',isAuthenticatedUser , authorizeRoles() , catchasyncerror(async (req, res, next) => {
+// router.put('/:orderid', catchasyncerror(async (req, res, next) => {
 
-    // res.send("Hello")
-    const order = await Order.findById( req.params.orderid )
-    if(!order){
-        return next(new ErrorHandler('Not found', 404));        
-    }
-    order.status === 'Chờ xác nhận' ? order.status = 'Đang hoạt động' : order
-    await order.save();
-    res.status(200).json({
-        order,
-        success: true
-    })  
+//     // res.send("Hello") isAuthenticatedUser , authorizeRoles() ,
+//     const order = await Order.findById( req.params.orderid )
+//     if(!order){
+//         return next(new ErrorHandler('Not found', 404));        
+//     }
+//     order.status === 'Dang cho duyet' ? order.status = 'Dang lam viec' : order
+//     await order.save();
+//     res.status(200).json({
+//         order,
+//         success: true
+//     })  
+// }))
+// cập nhật tình trạng order
+
+router.put('/:id', catchasyncerror( async (req, res)=> {
+    const order = await Order.findByIdAndUpdate(
+        req.params.id,
+        {
+            status: req.body.status
+        },
+        { new: true}
+    )
+
+    if(!order)
+    return res.status(400).send('the order cannot be update!')
+
+    res.send(order);
 }))
 
 // xóa 1 order 
@@ -133,7 +157,7 @@ router.get(`/get/count`, catchasyncerror(async (req, res) =>{
 }))
 
 // my order
-router.get(`/get/userorders/:userid`, isAuthenticatedUser, async (req, res) =>{
+router.get(`/get/userorders/:userid`, catchasyncerror(async (req, res) =>{
     const userOrderList = await Order.find({user: req.params.userid}).populate({ 
         path: 'orderItems', populate: {
             path : 'product', populate: 'category'} 
@@ -143,7 +167,7 @@ router.get(`/get/userorders/:userid`, isAuthenticatedUser, async (req, res) =>{
         res.status(500).json({success: false})
     } 
     res.send(userOrderList);
-})
+}))
 //user lay danh sach order co nv dang hoat dong(action)
 router.get(`/get/userorderactive/:userid`, isAuthenticatedUser, catchasyncerror(async (req, res) =>{
     
@@ -178,14 +202,14 @@ router.get(`/get/userorderfinished/:userid`, isAuthenticatedUser, catchasyncerro
  
 }))
 
-//user update 1 cong viec hoan thanh
-router.put(`/get/checkorder/:orderid`,isAuthenticatedUser, catchasyncerror(async (req, res, next) => {
+//user update 1 cong viec hoan thanh isAuthenticatedUser,
+router.put(`/get/checkorder/:orderid`, catchasyncerror(async (req, res, next) => {
     const action = await Order.findById( req.params.orderid )
 
     if(!action){
         return next(new ErrorHandler('Not found', 404));        
     }
-    action.status === 'Đang hoạt động' ? action.status = 'Hoàn thành' : action
+    action.status === '2' ? action.status = '1' : action
     await action.save();
     res.status(200).json({
         action,

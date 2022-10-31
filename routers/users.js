@@ -19,13 +19,6 @@ router.get(`/`, async (req, res) => {
     res.send(userList);  
 })
 
-router.get(`/:id`, async (req, res) => {
-    const user =  await User.findById(req.params.id).select('-passwordHash');
-    if(!user) {
-        res.status(500).json({success: false})
-    }
-    res.send(user);  
-})
 
 router.post(`/`, async (req, res) => {
     let user = new User({
@@ -83,6 +76,18 @@ router.post('/register', async (req,res)=>{
     })   
 })
 
+router.get('/logout', catchAsyncError(async(req, res) => {
+    res.cookie("token", null, {
+        expires: new Date(Date.now()),
+      });
+    
+      res.status(200).json({
+        success: true,
+        message: "Logged out successfully!!",
+      });
+}))
+
+
 router.get(`/get/count`, async (req, res) =>{
     const userCount = await User.countDocuments({count : count})
 
@@ -108,6 +113,13 @@ router.delete('/:id',(req, res)=>{
     })
 })
 
+router.get(`/:id`, async (req, res) => {
+    const user =  await User.findById(req.params.id).select('-passwordHash');
+    if(!user) {
+        res.status(500).json({message: 'The user with the given ID was not found.'})
+    }
+    res.status(200).send(user);
+})
 
 module.exports = router;
 
