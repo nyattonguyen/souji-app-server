@@ -11,7 +11,7 @@ const orderSchema = mongoose.Schema({
   address: {
     type: String,
     require: true,
-  }, 
+  },
   name: {
     type: String,
     require: true,
@@ -27,6 +27,10 @@ const orderSchema = mongoose.Schema({
   },
   totalPrice: {
     type: Number,
+  },
+  note: {
+    type: String,
+    default: "",
   },
   user: {
     type: mongoose.Schema.Types.ObjectId,
