@@ -10,7 +10,9 @@ const catchAsyncError = require("../middleware/catchasyncerror");
 const e = require("express");
 
 router.get(`/`, async (req, res) => {
-  const userList = await User.find().select("-passwordHash");
+  const sort = { status: -1 };
+  const userList = await User.find().select("-passwordHash").sort(sort);
+
   if (!userList) {
     res.status(500).json({ success: false });
   }
@@ -39,7 +41,9 @@ router.post(`/`, async (req, res) => {
 router.post(
   "/login",
   catchAsyncError(async (req, res, next) => {
-    const user = await User.findOne({ email: req.body.email });
+    const user = await User.findOne({ email: req.body.email }).where({
+      status: "enable",
+    });
 
     if (!user) {
       return res.status(400).send("The user not found!");
@@ -65,6 +69,7 @@ router.post("/register", async (req, res) => {
     city: req.body.city,
     phone: req.body.phone,
     isAdmin: req.body.isAdmin,
+    status: req.body.status,
   });
 
   user = await user.save();
@@ -128,24 +133,25 @@ router.put(
   })
 );
 
-router.delete("/:id", (req, res) => {
-  User.findByIdAndRemove(req.params.id)
-    .then((user) => {
-      if (user) {
-        return res
-          .status(200)
-          .json({ success: true, message: "the user is deleted!" });
-      } else {
-        return res
-          .status(404)
-          .json({ success: false, message: "user note found!" });
-      }
-    })
-    .catch((err) => {
-      return res.status(400).json({ success: false, error: err });
-    });
-});
+// router.delete("/:id", (req, res) => {
+//   User.findByIdAndRemove(req.params.id)
+//     .then((user) => {
+//       if (user) {
+//         return res
+//           .status(200)
+//           .json({ success: true, message: "the user is deleted!" });
+//       } else {
+//         return res
+//           .status(404)
+//           .json({ success: false, message: "user note found!" });
+//       }
+//     })
+//     .catch((err) => {
+//       return res.status(400).json({ success: false, error: err });
+//     });
+// });
 
+// get user by id
 router.get(`/:id`, async (req, res) => {
   const user = await User.findById(req.params.id).select("-passwordHash");
   if (!user) {
@@ -156,7 +162,21 @@ router.get(`/:id`, async (req, res) => {
   res.status(200).send(user);
 });
 
-module.exports = router;
+// disable user
+router.put(
+  `/disable/:id`,
+  catchAsyncError(async (req, res, next) => {
+    const disuser = await User.findById(req.params.id);
 
-// test token
-// eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiI2MzM4NjIzNmUzMzU2OGQyMWQ2ODAwOGIiLCJpc0FkbWluIjpmYWxzZSwiaWF0IjoxNjY0NjM5NjUyLCJleHAiOjE2NjQ3MjYwNTJ9.DCgQUoUAEf21aAQl9gvLg2NcRlDdE0EwMVAls2wdrf8
+    if (!disuser) {
+      return next(new ErrorHandler("Not found", 404));
+    }
+    disuser.status === "enable" ? (disuser.status = "disable") : disuser;
+    await disuser.save();
+    res.status(200).json({
+      disuser,
+      success: true,
+    });
+  })
+);
+module.exports = router;

@@ -8,12 +8,15 @@ const catchasyncerror = require("../middleware/catchasyncerror");
 router.get(
   `/`,
   catchasyncerror(async (req, res) => {
+    const sort = { status: -1 };
     let filter = {};
     if (req.query.categories) {
       filter = { category: req.query.categories.split(",") };
     }
 
-    const productList = await Product.find(filter).populate("category");
+    const productList = await Product.find(filter)
+      .populate("category")
+      .sort(sort);
     if (!productList) {
       res.status(500).json({ success: false });
     }
@@ -22,6 +25,24 @@ router.get(
     //   productList,
     //   success: true,
     // });
+  })
+);
+
+router.get(
+  `/priceasc`,
+  catchasyncerror(async (req, res) => {
+    let filter = {};
+    if (req.query.categories) {
+      filter = { category: req.query.categories.split(",") };
+    }
+    const sort = { price: 1 };
+    const productListAsc = await Product.find(filter)
+      .populate("category")
+      .sort(sort);
+    if (!productListAsc) {
+      res.status(500).json({ success: false });
+    }
+    res.send(productListAsc);
   })
 );
 
@@ -72,7 +93,7 @@ router.put(
       {
         name: req.body.name,
         price: req.body.price,
-        quanlity: req.body.quanlity,
+        quanlityH: req.body.quanlityH,
         desc: req.body.desc,
         category: req.body.category,
       },
@@ -86,7 +107,42 @@ router.put(
     res.send(product);
   })
 );
+// pin product
+router.put(
+  `/get/pin/:id`,
+  catchasyncerror(async (req, res, next) => {
+    const active = await Product.findById(req.params.id);
 
+    if (!active) {
+      return next(new ErrorHandler("Not found", 404));
+    }
+    active.status === false ? (active.status = true) : active;
+    await active.save();
+    res.status(200).json({
+      active,
+      success: true,
+    });
+  })
+);
+// unpin product
+router.put(
+  `/get/unpin/:id`,
+  catchasyncerror(async (req, res, next) => {
+    const unactive = await Product.findById(req.params.id);
+
+    if (!unactive) {
+      return next(new ErrorHandler("Not found", 404));
+    }
+    unactive.status === true ? (unactive.status = false) : unactive;
+    await unactive.save();
+    res.status(200).json({
+      unactive,
+      success: true,
+    });
+  })
+);
+
+//delete product
 router.delete(
   "/:id",
   catchasyncerror((req, res) => {

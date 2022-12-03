@@ -7,27 +7,46 @@ const router = express.Router();
 const mongoose = require("mongoose");
 const catchasyncerror = require("../middleware/catchasyncerror");
 const ErrorHandler = require("../utils/errorHandler");
-const { isAuthenticatedUser, authorizeRoles } = require("../middleware/auth");
-const { User } = require("../models/user");
-const { response } = require("express");
+const paypal = require("paypal-rest-sdk");
+// const paypal = require("../paypal_api");
 
-// lấy tất cả các order
-// router.get('/', isAuthenticatedUser, authorizeRoles(), async(req, res) => {
-//     const orderList = await Order.find().populate('user', 'name');
-//     if(!orderList) {
-//         res.status(500).json({message: false})
-//     }
-//     res.status(200).send(orderList);
-// })
+const { isAuthenticatedUser, authorizeRoles } = require("../middleware/auth");
 
 router.get(
   "/",
   catchasyncerror(async (req, res) => {
-    const orderList = await Order.find().populate("user", "name");
+    const orderList = await Order.find()
+      .populate("user", "name")
+      .sort({ dateOrdered: -1 });
     if (!orderList) {
       res.status(500).json({ message: false });
     }
     res.status(200).send(orderList);
+  })
+);
+router.get(
+  "/priceasc",
+  catchasyncerror(async (req, res) => {
+    const sort = { totalPrice: 1 };
+    const orderListAsc = await Order.find().populate("user", "name").sort(sort);
+    if (!orderListAsc) {
+      res.status(500).json({ message: false });
+    }
+    res.status(200).send(orderListAsc);
+  })
+);
+
+router.get(
+  "/pricedesc",
+  catchasyncerror(async (req, res) => {
+    const sort = { totalPrice: -1 };
+    const orderListDesc = await Order.find()
+      .populate("user", "name")
+      .sort(sort);
+    if (!orderListDesc) {
+      res.status(500).json({ message: false });
+    }
+    res.status(200).send(orderListDesc);
   })
 );
 //lấy 1 order
@@ -98,6 +117,38 @@ router.post(
   })
 );
 
+// Admin tính tổng tất cả order
+router.get(
+  "/get/totalsales",
+  authorizeRoles(),
+  catchasyncerror(async (req, res) => {
+    const totalSales = await Order.aggregate([
+      { $group: { _id: null, totalsales: { $sum: "$totalPrice" } } },
+    ]);
+
+    if (!totalSales) {
+      return res.status(400).send("The order sales cannot be generated");
+    }
+
+    res.send({ totalsales: totalSales.pop().totalsales });
+  })
+);
+
+//Dem so order
+router.get(
+  `/get/count`,
+  catchasyncerror(async (req, res) => {
+    const orderCount = await Order.countDocuments();
+
+    if (!orderCount) {
+      res.status(500).json({ success: false });
+    }
+    res.send({
+      orderCount: orderCount,
+    });
+  })
+);
+//
 router.put(
   "/:id",
   catchasyncerror(async (req, res) => {
@@ -141,37 +192,86 @@ router.delete(
   })
 );
 
-// Admin tính tổng tất cả order
-router.get(
-  "/get/totalsales",
-  authorizeRoles(),
-  catchasyncerror(async (req, res) => {
-    const totalSales = await Order.aggregate([
-      { $group: { _id: null, totalsales: { $sum: "$totalPrice" } } },
-    ]);
+// payment
+paypal.configure({
+  mode: "sandbox", //sandbox or live
+  client_id:
+    "AdeQQuVPPDexbJ225FqJQJLcuZwTc3Ti3JyyeE3lFtu7nPUV5r8sYL1erfDYUCpaQQgmwnQ7iFtrCoGB",
+  client_secret:
+    "EMAvMtEOeBQR3sUauAJykRFNzOoSZieYi6X4zd_-BNBJ344nQmP6Dy6GBT2Ob_Y2Rr3ck7_jMogKuqBi",
+});
 
-    if (!totalSales) {
-      return res.status(400).send("The order sales cannot be generated");
+router.post("/pay", function (req, res) {
+  const create_payment_json = {
+    intent: "sale",
+    payer: {
+      payment_method: "paypal",
+    },
+    redirect_urls: {
+      return_url: "http://192.168.1.10:3333/success",
+      cancel_url: "http://192.168.1.10:3333/cancel",
+    },
+    transactions: [
+      {
+        item_list: {
+          items: "aaa",
+        },
+        amount: {
+          currency: "USD",
+          total: "100",
+        },
+        description: "Hat for the best team ever",
+      },
+    ],
+  };
+
+  paypal.payment.create(create_payment_json, function (error, payment) {
+    if (error) {
+      res.render("cancle");
+    } else {
+      for (let i = 0; i < payment.links.length; i++) {
+        if (payment.links[i].rel === "approval_url") {
+          res.redirect(payment.links[i].href);
+        }
+      }
     }
+  });
+});
+router.get("/cancle", function (req, res) {
+  res.render("cancle");
+});
+router.get("/success", (req, res) => {
+  const payerId = req.query.PayerID;
+  const paymentId = req.query.paymentId;
 
-    res.send({ totalsales: totalSales.pop().totalsales });
-  })
-);
+  const execute_payment_json = {
+    payer_id: payerId,
+    transactions: [
+      {
+        amount: {
+          currency: "USD",
+          total: total.toString(),
+        },
+      },
+    ],
+  };
 
+  paypal.payment.execute(
+    paymentId,
+    execute_payment_json,
+    function (error, payment) {
+      if (error) {
+        res.render("cancle");
+      } else {
+        console.log(JSON.stringify(payment));
+        res.render("success");
+      }
+    }
+  );
+});
+
+router.get("/cancel", (req, res) => res.send("Cancelled"));
 //
-router.get(
-  `/get/count`,
-  catchasyncerror(async (req, res) => {
-    const orderCount = await Order.countDocuments();
-
-    if (!orderCount) {
-      res.status(500).json({ success: false });
-    }
-    res.send({
-      orderCount: orderCount,
-    });
-  })
-);
 
 // my order
 router.get(
@@ -291,6 +391,23 @@ router.put(
       return next(new ErrorHandler("Not found", 404));
     }
     action.status === "2" ? (action.status = "1") : action;
+    await action.save();
+    res.status(200).json({
+      action,
+      success: true,
+    });
+  })
+);
+//user delete 1 cong viec moi
+router.put(
+  `/get/deleteorder/:orderid`,
+  catchasyncerror(async (req, res, next) => {
+    const action = await Order.findById(req.params.orderid);
+
+    if (!action) {
+      return next(new ErrorHandler("Not found", 404));
+    }
+    action.status === "4" ? (action.status = "5") : action;
     await action.save();
     res.status(200).json({
       action,

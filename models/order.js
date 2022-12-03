@@ -12,6 +12,10 @@ const orderSchema = mongoose.Schema({
     type: String,
     require: true,
   },
+  country: {
+    type: String,
+    require: true,
+  },
   name: {
     type: String,
     require: true,
