@@ -7,7 +7,8 @@ const router = express.Router();
 router.get(
   `/`,
   catchasyncerror(async (req, res) => {
-    const categoryList = await Category.find();
+    const sort = { status: -1 };
+    const categoryList = await Category.find().sort(sort);
     if (!categoryList) {
       res.status(500).json({ success: false });
     }
@@ -85,6 +86,43 @@ router.delete(
       .catch((err) => {
         return res.status(400).json({ success: false, error: err });
       });
+  })
+);
+router.put(
+  `/disable/:id`,
+  catchasyncerror(async (req, res, next) => {
+    const discategory = await Category.findByIdAndUpdate(req.params.id);
+
+    if (!discategory) {
+      return next(new ErrorHandler("Not found", 404));
+    }
+    discategory.status === "enable"
+      ? (discategory.status = "disable")
+      : discategory;
+    await discategory.save();
+    res.status(200).json({
+      discategory,
+      success: true,
+    });
+  })
+);
+
+router.put(
+  `/enable/:id`,
+  catchasyncerror(async (req, res, next) => {
+    const discategory = await Category.findByIdAndUpdate(req.params.id);
+
+    if (!discategory) {
+      return next(new ErrorHandler("Not found", 404));
+    }
+    discategory.status === "disable"
+      ? (discategory.status = "enable")
+      : discategory;
+    await discategory.save();
+    res.status(200).json({
+      discategory,
+      success: true,
+    });
   })
 );
 

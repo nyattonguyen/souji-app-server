@@ -1,13 +1,17 @@
+require("dotenv/config");
 const { User } = require("../models/user");
+
 const express = require("express");
 const router = express.Router();
 const bcrypt = require("bcryptjs");
 const mongoose = require("mongoose");
 const jwt = require("jsonwebtoken");
+const crypto = require("crypto");
+const { bioEmail } = require("../middleware/restpw");
 const sendToken = require("../utils/jwtToken");
 const ErrorHandler = require("../utils/errorHandler");
 const catchAsyncError = require("../middleware/catchasyncerror");
-const e = require("express");
+const { sendEmail } = require("../utils/sendEmailChangeOrForgotPassword");
 
 router.get(`/`, async (req, res) => {
   const sort = { status: -1 };
@@ -53,6 +57,7 @@ router.post(
       req.body.password,
       user.passwordHash
     );
+
     if (!isMatchPassworded)
       return next(new ErrorHandler("Password or username wrong!!", 404));
     sendToken(user, 200, res);
@@ -93,6 +98,120 @@ router.get(
       success: true,
       message: "Logged out successfully!!",
     });
+  })
+);
+// reset pw
+router.put(
+  `/forgotpassword`,
+  catchAsyncError(async (req, res) => {
+    const { email } = req.body;
+    const user = await User.findOne({ email: email });
+
+    console.log(user);
+
+    if (!user) {
+      return res.status(200).json({
+        status: false,
+        message: "Invalid Email",
+      });
+    }
+
+    const token = jwt.sign(
+      {
+        id: user._id,
+      },
+      process.env.SECRET_KEY_TOKEN
+    );
+
+    await user.updateOne({ resetPasswordLink: token });
+
+    const templateEmail = {
+      from: "nhat250701@gmail.com",
+      to: email,
+      subject: "Link reset password",
+      html: `<p>Changepassword </p><p>${process.env.CLIENT_URL}/resetpassword/${token}</p>`,
+    };
+
+    bioEmail(templateEmail);
+
+    return res.status(200).json({
+      status: true,
+      message: "Link reset password from E-SOUJI",
+    });
+  })
+);
+
+router.put(
+  `/forgot`,
+  catchAsyncError(async (req, res, next) => {
+    const user = await User.findOne({ email: req.body.email });
+
+    if (!user) {
+      return next(new ErrorHandler("User not found", 404));
+    }
+
+    console.log(user);
+
+    // @ts-ignore
+    const tokenReset = await user.getResetPasswordToken();
+    await user.save({ validateBeforeSave: false });
+
+    const resetPasswordUrl = `http://localhost:3000/reset-password/${tokenReset}`;
+
+    const message = `Your password reset token is <a href="${resetPasswordUrl}">Click</a> you have a link`;
+
+    try {
+      await sendEmail({
+        email: user.email,
+        suject: "E-Souji",
+        message: `<b>Changepassword Link:${message} </b>`,
+        html: `<b>Changepassword Link: ${message}</b>`,
+      });
+
+      return res.status(200).json({
+        success: true,
+        message,
+        email: user.email,
+        suject: "E-Souji",
+        html: `<b>Changepassword Link: </b>${message}`,
+      });
+    } catch (error) {
+      user.resetPasswordToken = undefined;
+      user.resetPasswordExpire = undefined;
+
+      await user.save({ validateBeforeSave: false });
+
+      return next(new ErrorHandler("server internal :  " + error.message, 500));
+    }
+  })
+);
+
+router.put(
+  `/resetpassword`,
+  catchAsyncError(async (req, res, next) => {
+    const resetPasswordToken = await crypto
+      .createHash("sha256")
+      .update(req.params.token)
+      .digest("hex");
+
+    const user = await User.findOne({
+      resetPasswordExpire: { $gt: Date.now() },
+      resetPasswordToken,
+    });
+
+    if (!user) {
+      return next(new ErrorHandler("User not found or not logged in", 404));
+    }
+
+    if (req.body.newPasssword !== req.body.confirmPassword) {
+      return next(new ErrorHandler("Comfirm password not matched", 400));
+    }
+
+    user.password = req.body.newPasssword;
+
+    await user.save();
+
+    sendToken(user, 200, res);
   })
 );
 
@@ -179,4 +298,5 @@ router.put(
     });
   })
 );
+
 module.exports = router;
